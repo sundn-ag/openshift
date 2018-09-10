@@ -1,6 +1,8 @@
 # Step-By-Step Backup and Restore Guide 
 by:  *S&N AG, Paderborn, Germany*
 
+This guide has been developed due to the lack of information about which files are important when making a Backup / Restore of OpenShift Origin. The procedure has been tested with OpenShift Origin v. 3.6 and is based on the information provided by the official documentation: https://docs.okd.io/3.6/admin_guide/backup_restore.html
+
 
 
 ## Backup
