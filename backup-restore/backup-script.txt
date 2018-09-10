@@ -1,0 +1,58 @@
+#!/bin/bash
+# by: S&N AG, Paderborn, Germany
+
+etcd_dir=/var/lib/etcd
+master_dir=/etc/origin/master
+docker_dir=/etc/docker/certs.d
+backup_dir=/openshift-backup
+backup_name=backup
+
+# Check, if the svc/router in the default project is active. If it is not, then 
+# there is a Problem within the Cluster. In that case, the old backup is not overwritten.
+oc project default
+grep_result=`oc status |grep -c "svc/router"`
+if [ "$grep_result" == "1" ]
+  then
+    echo "OpenShift-test successful. Backup-name stays:"
+    echo $backup_name
+  else
+    echo "Error while testing OpenShift. Using following Backup-name:"
+    backup_name+="_"$(date "+%Y.%m.%d")
+    echo $backup_name
+fi
+
+echo "create backup-directory"
+echo "delete old directory, if exists"
+find $backup_dir/$backup_name/ -delete
+sleep 5s
+mkdir ./$backup_name
+echo "backup master-certificates"
+
+# backup certificates
+sleep 5s
+rsync -aPz $master_dir  $backup_dir/$backup_name/
+
+# create ETCD - Backup, stop ETCD and restart
+echo "stop ETCD"
+systemctl stop etcd
+sleep 10s
+echo "make Backup of the ETCD-directory"
+etcdctl backup --data-dir $etcd_dir -backup-dir $backup_dir/$backup_name/etcd
+# backup db-file 
+cp $etcd_dir/member/snap/db $backup_dir/$backup_name/etcd/member/snap/db
+echo "restart ETCD"
+sleep 5s
+systemctl restart etcd
+
+# backup docker-registry-certificates 
+echo "backup docker-certificates"
+cd $docker_dir
+tar cf $backup_dir/$backup_name/docker-registry-certs-master.tar *
+
+# backup docker-registry-certificates on all Workers
+for nodes in 01 02 03
+do
+rsync -aPz root@node-$nodes.s-und-n.de:/etc/docker/certs.d/  $backup_dir/$backup_name/docker-certs-node-$nodes
+sleep 3s
+done
+echo "done"
